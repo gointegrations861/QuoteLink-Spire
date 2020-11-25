@@ -57,7 +57,6 @@ Public Class SpireAPIContainer
         If CustomerID.Length > 0 Then
             Dim request = WebRequest.Create(New Uri(url, "customers/" & CustomerID))
             request.Headers.Add("Authorization", auth)
-
             Using response = request.GetResponse()
                 Dim sr = New StreamReader(response.GetResponseStream())
                 Dim jsonobj = Helpers.Json.Decode(sr.ReadToEnd)

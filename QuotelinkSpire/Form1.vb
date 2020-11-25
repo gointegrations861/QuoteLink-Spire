@@ -3027,108 +3027,121 @@ Public Class Form1
                                         'Step 15.7.4: Set current cost
                                         api_additem.Add("currentCost", qwUnitCost)
 
-                                        If CUSTOMIZATION = Custom.Electromate Then
-                                            api_additem.Add("description", .GetFieldValue("ManufacturerPartNumber").ToString().Trim())
-                                            api_additem.Add("extendedDescription", FullDesc.Replace(Environment.NewLine, vbLf))
-                                            api_additem.Add("harmonizedCode", .GetFieldValue("CustomText07").ToString().Trim())
-
-                                            Dim countryOfOrigin = .GetFieldValue("CustomText09").ToString().Trim()
-                                            If countryMapDict.ContainsKey(countryOfOrigin.ToLower()) Then
-                                                api_additem.Add("manufactureCountry", countryMapDict(countryOfOrigin.ToLower()))
-                                            End If
-
-                                            'Dim category = getCategory(Code, .GetFieldValue("Vendor").ToString().Trim())
-                                            'Hardcoding it for now since it doesn't seem possible to properly determine which product database the item is from
-                                            Dim category = getCategory(Code, "Electromate")
-                                            If category.Length > 0 AndAlso spireAPI.CheckProductCode(category) Then
-                                                api_additem.Add("productCode", category)
-                                            End If
-
-                                            Dim vendor = .GetFieldValue("CustomText08").ToString().Trim().ToUpper()
-                                            If vendor.Length > 0 AndAlso spireAPI.CheckVendor(vendor) Then
-                                                api_additem.Add("primaryVendor", New Dictionary(Of String, String))
-                                                api_additem("primaryVendor").Add("vendorNo", vendor)
-                                                If vendorDict.ContainsKey(vendor) Then
-                                                    If vendorDict(vendor).Item1 Then
-                                                        api_additem.Add("lotNumbered", True)
-                                                    ElseIf vendorDict(vendor).Item2 Then
-                                                        api_additem.Add("serialized", True)
-                                                    End If
+                                        Dim s As String = ""
+                                        If .GetFieldValue("CustomText07").ToString().Trim() <> "" Then
+                                            s = .GetFieldValue("CustomText07").ToString().Trim()
+                                            Dim numberOfChrechters As Integer = s.Length
+                                            If numberOfChrechters > 27 Then
+                                                If s.Contains("\") Then
+                                                    Dim index = s.IndexOf("\")
+                                                    s = s.Substring(0, index)
+                                                Else
+                                                    s = s.Substring(0, 26)
                                                 End If
                                             End If
-                                        Else
-                                            'Step 15.7.5: Set description
-                                            api_additem.Add("description", FullDesc1Line)
                                         End If
 
-                                        'Step 15.7.6: Read default UOM from database
-                                        Dim defaultUOM As String = Nothing
-                                        Using conn = New OdbcConnection(connectionString)
-                                            conn.Open()
+                                        If CUSTOMIZATION = Custom.Electromate Then
+                                                api_additem.Add("description", .GetFieldValue("ManufacturerPartNumber").ToString().Trim())
+                                                api_additem.Add("extendedDescription", FullDesc.Replace(Environment.NewLine, vbLf))
+                                                api_additem.Add("harmonizedCode", s)
+                                                Dim countryOfOrigin = .GetFieldValue("CustomText09").ToString().Trim()
+                                                If countryMapDict.ContainsKey(countryOfOrigin.ToLower()) Then
+                                                    api_additem.Add("manufactureCountry", countryMapDict(countryOfOrigin.ToLower()))
+                                                End If
 
-                                            sql = "select txt_data from system_settings where key = 'spire.inventory.default_stock_uom'"
+                                                'Dim category = getCategory(Code, .GetFieldValue("Vendor").ToString().Trim())
+                                                'Hardcoding it for now since it doesn't seem possible to properly determine which product database the item is from
+                                                Dim category = getCategory(Code, "Electromate")
+                                                If category.Length > 0 AndAlso spireAPI.CheckProductCode(category) Then
+                                                    api_additem.Add("productCode", category)
+                                                End If
 
-                                            Using comm = New OdbcCommand(sql, conn)
-                                                Try
-                                                    defaultUOM = comm.ExecuteScalar().ToString().Trim()
-                                                Catch ex As Exception
-                                                End Try
-                                            End Using
-                                        End Using
+                                                Dim vendor = .GetFieldValue("CustomText08").ToString().Trim().ToUpper()
+                                                If vendor.Length > 0 AndAlso spireAPI.CheckVendor(vendor) Then
+                                                    api_additem.Add("primaryVendor", New Dictionary(Of String, String))
+                                                    api_additem("primaryVendor").Add("vendorNo", vendor)
+                                                    If vendorDict.ContainsKey(vendor) Then
+                                                        If vendorDict(vendor).Item1 Then
+                                                            api_additem.Add("lotNumbered", True)
+                                                        ElseIf vendorDict(vendor).Item2 Then
+                                                            api_additem.Add("serialized", True)
+                                                        End If
+                                                    End If
+                                                End If
+                                            Else
+                                                'Step 15.7.5: Set description
+                                                api_additem.Add("description", FullDesc1Line)
+                                            End If
 
-                                        If defaultUOM.Length = 0 Or defaultUOM Is Nothing Then
-                                            defaultUOM = "EA"
-                                        End If
+                                            'Step 15.7.6: Read default UOM from database
+                                            Dim defaultUOM As String = Nothing
+                                            Using conn = New OdbcConnection(connectionString)
+                                                conn.Open()
 
-                                        'Step 15.7.7: Set pricing
-                                        api_additem.Add("pricing", New Dictionary(Of String, Object))
-                                        api_additem("pricing").Add(defaultUOM, New Dictionary(Of String, Object))
-                                        api_additem("pricing")(defaultUOM).Add("sellPrices", New List(Of Decimal))
-                                        api_additem("pricing")(defaultUOM)("sellPrices").Add(spireUnitPrice)
+                                                sql = "select txt_data from system_settings where key = 'spire.inventory.default_stock_uom'"
 
-                                        'Step 15.7.8: Insert item
-                                        status = spireAPI.AddItem(api_additem)
-                                        If status Is Nothing Then
-                                            quitTransfer = True
-                                        Else
-
-                                            'Commenting this since consecutive requests seem to crash for electromate
-                                            itemObj = spireAPI.GetItem(status)
-
-                                            'Add Custom Fields
-                                            If CUSTOMIZATION = Custom.Electromate Then
-                                                Dim itemID = status.ToString()
-
-                                                Dim estore = .GetFieldValue("CustomText01").ToString().Trim()
-                                                Dim customnumber = .GetFieldValue("CustomText02").ToString().Trim()
-                                                Dim vendorpart = .GetFieldValue("VendorPartNumber").ToString().Trim()
-
-                                                Using conn = New OdbcConnection(connectionString)
-                                                    conn.Open()
-
-                                                    sql = String.Format("update inventory set udf_data = udf_data || '{{""QW_VendorP"":""{1}""{2}{3}}}' where id = {0}",
-                                                                        itemID,
-                                                                        vendorpart,
-                                                                        If(estore.Length <> 0, ",""QW_CT01"":""" & estore.Replace("'", "''") & """", ""),
-                                                                        If(customnumber.Length <> 0, ",""QW_CT02"":""" & customnumber.Replace("'", "''") & """", ""))
-                                                    Using comm = New OdbcCommand(sql, conn)
-                                                        Try
-                                                            rowsAffected = comm.ExecuteNonQuery()
-                                                        Catch ex As Exception
-                                                            MessageBox.Show("Error updating custom fields for new item", "Spire Error")
-                                                            My.Application.Log.WriteEntry("Error Writing Item UDFs", TraceEventType.Critical)
-                                                            My.Application.Log.WriteException(ex)
-                                                            My.Application.Log.WriteEntry(sql, TraceEventType.Critical)
-                                                            comm.Dispose()
-                                                            conn.Close()
-                                                            Return False
-                                                        End Try
-                                                    End Using
+                                                Using comm = New OdbcCommand(sql, conn)
+                                                    Try
+                                                        defaultUOM = comm.ExecuteScalar().ToString().Trim()
+                                                    Catch ex As Exception
+                                                    End Try
                                                 End Using
+                                            End Using
+
+                                            If defaultUOM.Length = 0 Or defaultUOM Is Nothing Then
+                                                defaultUOM = "EA"
+                                            End If
+
+                                            'Step 15.7.7: Set pricing
+                                            api_additem.Add("pricing", New Dictionary(Of String, Object))
+                                            api_additem("pricing").Add(defaultUOM, New Dictionary(Of String, Object))
+                                            api_additem("pricing")(defaultUOM).Add("sellPrices", New List(Of Decimal))
+                                            api_additem("pricing")(defaultUOM)("sellPrices").Add(spireUnitPrice)
+
+                                            'Step 15.7.8: Insert item
+                                            status = spireAPI.AddItem(api_additem)
+                                            If status Is Nothing Then
+                                                quitTransfer = True
+                                            Else
+
+                                                'Commenting this since consecutive requests seem to crash for electromate
+                                                itemObj = spireAPI.GetItem(status)
+
+                                                'Add Custom Fields
+                                                If CUSTOMIZATION = Custom.Electromate Then
+                                                    Dim itemID = status.ToString()
+
+                                                    Dim estore = .GetFieldValue("CustomText01").ToString().Trim()
+                                                    Dim customnumber = .GetFieldValue("CustomText02").ToString().Trim()
+                                                    Dim vendorpart = .GetFieldValue("VendorPartNumber").ToString().Trim()
+
+                                                    Using conn = New OdbcConnection(connectionString)
+                                                        conn.Open()
+
+                                                        sql = String.Format("update inventory set udf_data = udf_data || '{{""QW_VendorP"":""{1}""{2}{3}}}' where id = {0}",
+                                                                            itemID,
+                                                                            vendorpart,
+                                                                            If(estore.Length <> 0, ",""QW_CT01"":""" & estore.Replace("'", "''") & """", ""),
+                                                                            If(customnumber.Length <> 0, ",""QW_CT02"":""" & customnumber.Replace("'", "''") & """", ""))
+                                                        Using comm = New OdbcCommand(sql, conn)
+                                                            Try
+                                                                rowsAffected = comm.ExecuteNonQuery()
+                                                            Catch ex As Exception
+                                                                MessageBox.Show("Error updating custom fields for new item", "Spire Error")
+                                                                My.Application.Log.WriteEntry("Error Writing Item UDFs", TraceEventType.Critical)
+                                                                My.Application.Log.WriteException(ex)
+                                                                My.Application.Log.WriteEntry(sql, TraceEventType.Critical)
+                                                                comm.Dispose()
+                                                                conn.Close()
+                                                                Return False
+                                                            End Try
+                                                        End Using
+                                                    End Using
+                                                End If
                                             End If
                                         End If
-                                    End If
-                                Else
+                                    Else
                                     'Step 15.8: Item exists; get item values
                                     itemObj = spireAPI.GetItem(itemObj("records")(0)("id"))
                                     Dim custSellLevel As Integer = 1
