@@ -3111,9 +3111,9 @@ Public Class Form1
                                                 'Add Custom Fields
                                                 If CUSTOMIZATION = Custom.Electromate Then
                                                     Dim itemID = status.ToString()
-
-                                                    Dim estore = .GetFieldValue("CustomText01").ToString().Trim()
-                                                    Dim customnumber = .GetFieldValue("CustomText02").ToString().Trim()
+                                                'estore will always be zero or null in this case
+                                                Dim estore = ""
+                                                Dim customnumber = .GetFieldValue("CustomText02").ToString().Trim()
                                                     Dim vendorpart = .GetFieldValue("VendorPartNumber").ToString().Trim()
 
                                                     Using conn = New OdbcConnection(connectionString)
